@@ -54,16 +54,12 @@ void main() {
   test('pem', () {
     Identity rsa1 = parsePem(File('test/id_rsa').readAsStringSync());
     Identity rsa2 = parsePem(File('test/id_rsa.openssh').readAsStringSync());
-    expect(rsa1.rsaPublic.exponent, rsa2.rsaPublic.exponent);
+    expect(rsa1.rsaPublic!.exponent, rsa2.rsaPublic!.exponent);
   });
 
   test('TestSocket', () {
     TestSocket socket = TestSocket();
-    SSHClient ssh = SSHClient(
-        socketInput: socket,
-        print: print,
-        debugPrint: print,
-        tracePrint: print);
+    SSHClient ssh = SSHClient(socketInput: socket, print: print, debugPrint: print, tracePrint: print);
     socket.connect(Uri.parse('tcp://foobar:22'), ssh.onConnected, (_) {});
     expect(socket.sent.removeFirst(), 'SSH-2.0-dartssh_1.0\r\n');
     ssh.disconnect('done');
@@ -73,17 +69,16 @@ void main() {
   test('TestHttpClient', () async {
     TestHttpClient httpClient = TestHttpClient();
     Future<bool> httpTestResult = httpTest(httpClient);
-    httpClient.requests.removeFirst().completer.complete(
-        HttpResponse(200, text: '<html>support@greenappers.com</html>'));
+    httpClient.requests
+        .removeFirst()
+        .completer
+        .complete(HttpResponse(200, text: '<html>support@greenappers.com</html>'));
     expect(httpTestResult, completion(equals(true)));
   });
 
   test('cipher suite', () async {
     int kexIndex = 1, keyIndex = 1, cipherIndex = 1, macIndex = 1;
-    bool kexLooped = false,
-        keyLooped = false,
-        cipherLooped = false,
-        macLooped = false;
+    bool kexLooped = false, keyLooped = false, cipherLooped = false, macLooped = false;
     KEX.supported = (int id) => id == kexIndex;
     Key.supported = (int id) => id == keyIndex;
     Cipher.supported = (int id) => id == cipherIndex;
@@ -118,8 +113,7 @@ void main() {
       Future<void> sshdMain = sshd.sshd(<String>[
         '-p 42022',
         '-h',
-        (keyIndex == Key.ECDSA_SHA2_NISTP384 ||
-                keyIndex == Key.ECDSA_SHA2_NISTP521)
+        (keyIndex == Key.ECDSA_SHA2_NISTP384 || keyIndex == Key.ECDSA_SHA2_NISTP521)
             ? 'test/${Key.name(keyIndex)}/ssh_host_'
             : 'test/ssh_host_',
         '--debug',
@@ -135,13 +129,14 @@ void main() {
         identityFile,
         '--debug',
         '--trace',
-      ], sshInput.stream, (_, String v) => sshResponse += v,
-          () => sshInput.close());
+      ], sshInput.stream, (_, Uint8List? v) {
+        sshResponse += v.toString();
+      }, () => sshInput.close());
 
       while (ssh.client.sessionChannel == null) {
         await Future.delayed(const Duration(seconds: 1));
       }
-      ssh.client.sendChannelData(utf8.encode('testAgent\nexit\n'));
+      ssh.client.sendChannelData(utf8.encode('testAgent\nexit\n') as Uint8List);
       await sshMain;
       await sshdMain;
       expect(sshResponse, '\$ testAgent\nexit\nsuccess\n');
@@ -175,18 +170,9 @@ void main() {
     expect(httpTest(HttpClientImpl()), completion(equals(true)));
     String password = 'foobar123';
 
-    KEX.supported =
-        Key.supported = Cipher.supported = MAC.supported = (_) => true;
-    Future<void> sshdMain = sshd.sshd(<String>[
-      '-p 42022',
-      '-h',
-      'test/ssh_host_',
-      '--debug',
-      '--trace',
-      '--forwardTcp',
-      '--password',
-      password
-    ]);
+    KEX.supported = Key.supported = Cipher.supported = MAC.supported = (_) => true;
+    Future<void> sshdMain = sshd.sshd(
+        <String>['-p 42022', '-h', 'test/ssh_host_', '--debug', '--trace', '--forwardTcp', '--password', password]);
 
     String sshResponse = '';
     StreamController<List<int>> sshInput = StreamController<List<int>>();
@@ -198,8 +184,7 @@ void main() {
       password,
       '--debug',
       '--trace',
-    ], sshInput.stream, (_, String v) => sshResponse += v,
-        () => sshInput.close());
+    ], sshInput.stream, (_, Uint8List? v) => sshResponse += v.toString(), () => sshInput.close());
 
     while (ssh.client.sessionChannel == null) {
       await Future.delayed(const Duration(seconds: 1));
@@ -207,26 +192,22 @@ void main() {
     ssh.client.setTerminalWindowSize(80, 25);
     ssh.client.exec('ls');
 
-    bool tunneledHttpTest = await httpTest(
-        HttpClientImpl(clientFactory: () => SSHTunneledBaseClient(ssh.client)),
-        proto: 'http');
+    bool tunneledHttpTest =
+        await httpTest(HttpClientImpl(clientFactory: () => SSHTunneledBaseClient(ssh.client)), proto: 'http');
     expect(tunneledHttpTest, true);
 
-    ssh.client.sendChannelData(utf8.encode('debugTest\nexit\n'));
+    ssh.client.sendChannelData(utf8.encode('debugTest\nexit\n') as Uint8List);
     await sshMain;
     await sshdMain;
     expect(sshResponse, 'Password:\r\n\$ debugTest\nexit\n');
   });
 
   test('tunneled websocket test', () async {
-    expect(websocketEchoTest(WebSocketImpl(), proto: 'ws'),
-        completion(equals(true)));
+    expect(websocketEchoTest(WebSocketImpl(), proto: 'ws'), completion(equals(true)));
 
-    expect(websocketEchoTest(WebSocketImpl(), ignoreBadCert: true),
-        completion(equals(true)));
+    expect(websocketEchoTest(WebSocketImpl(), ignoreBadCert: true), completion(equals(true)));
 
-    KEX.supported =
-        Key.supported = Cipher.supported = MAC.supported = (_) => true;
+    KEX.supported = Key.supported = Cipher.supported = MAC.supported = (_) => true;
     Future<void> sshdMain = sshd.sshd(<String>[
       '-p 42022',
       '-h',
@@ -244,19 +225,17 @@ void main() {
       '127.0.0.1:42022',
       '--debug',
       '--trace',
-    ], sshInput.stream, (_, String v) => sshResponse += v,
-        () => sshInput.close());
+    ], sshInput.stream, (_, Uint8List? v) => sshResponse += v.toString(), () => sshInput.close());
 
     while (ssh.client.sessionChannel == null) {
       await Future.delayed(const Duration(seconds: 1));
     }
 
-    bool tunneledWebsocketTest = await websocketEchoTest(
-        SSHTunneledWebSocketImpl(SSHTunneledSocketImpl.fromClient(ssh.client)),
-        proto: 'ws');
+    bool tunneledWebsocketTest =
+        await websocketEchoTest(SSHTunneledWebSocketImpl(SSHTunneledSocketImpl.fromClient(ssh.client)), proto: 'ws');
     expect(tunneledWebsocketTest, true);
 
-    ssh.client.sendChannelData(utf8.encode('exit\n'));
+    ssh.client.sendChannelData(utf8.encode('exit\n') as Uint8List);
     await sshMain;
     await sshdMain;
     expect(sshResponse, '\$ exit\n');
@@ -265,26 +244,22 @@ void main() {
 
 Future<bool> httpTest(HttpClient httpClient, {String proto = 'https'}) async {
   var response = await httpClient.request('$proto://www.greenappers.com/');
-  return response != null && response.text.contains('support@greenappers.com');
+  return response != null && response.text!.contains('support@greenappers.com');
 }
 
-Future<bool> websocketEchoTest(WebSocketImpl websocket,
-    {bool ignoreBadCert = false, String proto = 'wss'}) async {
+Future<bool> websocketEchoTest(WebSocketImpl websocket, {bool ignoreBadCert = false, String proto = 'wss'}) async {
   final Completer<String> connectCompleter = Completer<String>();
-  websocket.connect(
-      Uri.parse('$proto://echo.websocket.org'),
-      () => connectCompleter.complete(null),
-      (String error) => connectCompleter.complete(error),
+  websocket.connect(Uri.parse('$proto://echo.websocket.org'), () => connectCompleter.complete(null),
+      (String? error) => connectCompleter.complete(error),
       ignoreBadCert: ignoreBadCert);
   final String error = await connectCompleter.future;
   if (error != null) return false;
 
   final Completer<String> responseCompleter = Completer<String>();
-  final String challenge =
-      'websocketEchoTest ${base64.encode(randBytes(Random.secure(), 16))}';
-  websocket.listen((Uint8List m) => responseCompleter.complete(utf8.decode(m)));
-  websocket.handleError((String m) => responseCompleter.complete(m));
-  websocket.handleDone((String m) => responseCompleter.complete(m));
+  final String challenge = 'websocketEchoTest ${base64.encode(randBytes(Random.secure(), 16))}';
+  websocket.listen((Uint8List? m) => responseCompleter.complete(utf8.decode(m!)));
+  websocket.handleError((String? m) => responseCompleter.complete(m));
+  websocket.handleDone((String? m) => responseCompleter.complete(m));
   websocket.send(challenge);
   final String response = await responseCompleter.future;
   websocket.close();
